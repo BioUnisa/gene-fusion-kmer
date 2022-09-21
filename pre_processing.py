@@ -64,10 +64,6 @@ def print_gene_kmers(file_path, id_gene, kmers):
 
 if __name__ == '__main__':
 
-    import time
-
-    start_time = time.time()
-
     parser = argparse.ArgumentParser()
 
     parser.add_argument('-f', dest='input_file', action='store',
@@ -87,6 +83,4 @@ if __name__ == '__main__':
         exit()
 
     generate_kmers_dataset(args.input_file, args.k_size, args.output_file, args.num_proc)
-    print(f"{args.output_file} generated")
-
-    print("--- %s seconds ---" % (time.time() - start_time))
+    print(f"{args.output_file} generated!")
