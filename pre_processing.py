@@ -6,6 +6,7 @@ from multiprocessing.pool import Pool
 import argparse
 import os
 
+#Game caos rap , one hot encode , ...
 
 def generate_kmers_dataset(source_file_path, k_size, dest_file_path, num_proc):
     # Read all fasta
