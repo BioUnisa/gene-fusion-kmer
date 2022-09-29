@@ -1,1 +1,5 @@
 Bio
+numpy
+pandas
+sklearn
+tensorflow
