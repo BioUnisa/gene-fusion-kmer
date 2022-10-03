@@ -10,6 +10,17 @@ import numpy as np
 import os
 
 
+def str2bool(v):
+    if isinstance(v, bool):
+        return v
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
+
+
 def read_sequences_from_fasta(file_path: str) -> (Sequence[str], Sequence[str]):
     _fasta_sequences = SeqIO.parse(open(file_path), 'fasta')
     _id_genes = []
@@ -47,21 +58,22 @@ def split_sequences_on_processes(_id_genes: Sequence[str], _sequences: Sequence[
 
 
 # Create two blank csv file for output
-def create_output_files(dest_file_name: str) -> (str, str):
+def create_output_files(dest_file_name: str, split: bool) -> (str, str):
     _training_path_file = os.path.join(os.getcwd(), "training", dest_file_name + "-training.csv")
-    _test_path_file = os.path.join(os.getcwd(), "test", dest_file_name + "-test.csv")
-
     os.makedirs(os.path.dirname(_training_path_file), exist_ok=True)
     with open(_training_path_file, 'w') as _write_obj:
         _csv_writer = writer(_write_obj)
         _csv_writer.writerow(['id_gene', 'kmer'])
 
-    os.makedirs(os.path.dirname(_test_path_file), exist_ok=True)
-    with open(_test_path_file, 'w') as _write_obj:
-        _csv_writer = writer(_write_obj)
-        _csv_writer.writerow(['id_gene', 'sequence'])
-
-    return _training_path_file, _test_path_file
+    if split:
+        _test_path_file = os.path.join(os.getcwd(), "test", dest_file_name + "-test.csv")
+        os.makedirs(os.path.dirname(_test_path_file), exist_ok=True)
+        with open(_test_path_file, 'w') as _write_obj:
+            _csv_writer = writer(_write_obj)
+            _csv_writer.writerow(['id_gene', 'sequence'])
+        return _training_path_file, _test_path_file
+    else:
+        return _training_path_file, ""
 
 
 def build_kmers(fasta_sequences: Sequence[Tuple[str, str]], k_size: int, file_path: str) -> None:
@@ -93,6 +105,8 @@ if __name__ == '__main__':
                         default='', help='fasta input file')
     parser.add_argument('-k_size', dest='k_size', action='store',
                         type=int, default=15, help='define size of kmer')
+    parser.add_argument('-split', dest='split', action='store',
+                        type=str2bool, default=True, help='split dataset in training and set')
     parser.add_argument('-t_size', dest='t_size', action='store',
                         type=float, default=0.3, help='define test size')
     parser.add_argument('-num_proc', dest='num_proc', action='store',
@@ -117,18 +131,23 @@ if __name__ == '__main__':
     print(f"Number of total genes: {len(list_of_genes)}")
 
     # Split in training and test
-    sequences_train, sequences_test, id_genes_train, id_genes_test = train_test_split(
-        sequences, id_genes, test_size=args.t_size, random_state=42)
-    print(f"Sequences divided by a coefficient: {args.t_size}")
-    print(f"Number of sequences in the training set: {len(sequences_train)}")
-    n_test_elements = len(sequences_test)
-    print(f"Number of sequences in the test set: {n_test_elements}")
-
-    # Split work on processes
-    split_fasta_sequences_train = split_sequences_on_processes(id_genes_train, sequences_train, args.num_proc)
+    sequences_train = sequences
+    id_genes_train = id_genes
+    if args.split:
+        sequences_train, sequences_test, id_genes_train, id_genes_test = train_test_split(
+            sequences, id_genes, test_size=args.t_size, random_state=42)
+        print(f"Sequences divided by a coefficient: {args.t_size}")
+        print(f"Number of sequences in the training set: {len(sequences_train)}")
+        n_test_elements = len(sequences_test)
+        print(f"Number of sequences in the test set: {n_test_elements}")
+        # Split work on processes
+        split_fasta_sequences_train = split_sequences_on_processes(id_genes_train, sequences_train, args.num_proc)
+    else:
+        # Split work on processes
+        split_fasta_sequences_train = split_sequences_on_processes(id_genes, sequences, args.num_proc)
 
     # Create output files
-    training_path_file, test_path_file = create_output_files(args.output_file)
+    training_path_file, test_path_file = create_output_files(args.output_file, args.split)
 
     # Create kmer training dataset
     with Pool(args.num_proc) as pool:
@@ -136,10 +155,11 @@ if __name__ == '__main__':
     print(f"{training_path_file} generated!")
 
     # Create test dataset
-    with open(test_path_file, 'a+') as write_obj:
-        csv_writer = writer(write_obj)
-        csv_writer.writerows([[id_genes_test[i], sequences_test[i]] for i in range(n_test_elements)])
-    print(f"{test_path_file} generated!")
+    if args.split:
+        with open(test_path_file, 'a+') as write_obj:
+            csv_writer = writer(write_obj)
+            csv_writer.writerows([[id_genes_test[i], sequences_test[i]] for i in range(n_test_elements)])
+        print(f"{test_path_file} generated!")
 
     # Update counter with number of kmers
     for i in range(len(sequences_train)):
@@ -152,7 +172,8 @@ if __name__ == '__main__':
     import pickle
 
     config = {
-        'k-size': args.k_size
+        'k-size': args.k_size,
+        'split': args.split
     }
     pickle_path_file = os.path.join(os.getcwd(), "training", args.output_file + ".pickle")
     with open(pickle_path_file, 'wb') as handle:
