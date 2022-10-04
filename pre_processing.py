@@ -1,13 +1,15 @@
-from Bio import SeqIO
 from csv import writer
 from functools import partial
 from multiprocessing.pool import Pool
 from sklearn.model_selection import train_test_split
 from typing import Sequence, Tuple
+from utils.file import read_sequences_from_fasta
+from utils.file import create_training_path_file, create_test_path_file, create_conf_path_file
 
 import argparse
 import numpy as np
 import os
+import pickle
 
 
 def str2bool(v):
@@ -19,18 +21,6 @@ def str2bool(v):
         return False
     else:
         raise argparse.ArgumentTypeError('Boolean value expected.')
-
-
-def read_sequences_from_fasta(file_path: str) -> (Sequence[str], Sequence[str]):
-    _fasta_sequences = SeqIO.parse(open(file_path), 'fasta')
-    _id_genes = []
-    _sequences = []
-
-    for fasta in _fasta_sequences:
-        _id_genes.append(fasta.id)
-        _sequences.append(str(fasta.seq))
-
-    return _id_genes, _sequences
 
 
 def split_sequences_on_processes(_id_genes: Sequence[str], _sequences: Sequence[str],
@@ -58,15 +48,15 @@ def split_sequences_on_processes(_id_genes: Sequence[str], _sequences: Sequence[
 
 
 # Create two blank csv file for output
-def create_output_files(dest_file_name: str, split: bool) -> (str, str):
-    _training_path_file = os.path.join(os.getcwd(), "training", dest_file_name + "-training.csv")
+def create_output_files(file_name: str, split: bool) -> (str, str):
+    _training_path_file = create_training_path_file(file_name)
     os.makedirs(os.path.dirname(_training_path_file), exist_ok=True)
     with open(_training_path_file, 'w') as _write_obj:
         _csv_writer = writer(_write_obj)
         _csv_writer.writerow(['id_gene', 'kmer'])
 
     if split:
-        _test_path_file = os.path.join(os.getcwd(), "test", dest_file_name + "-test.csv")
+        _test_path_file = create_test_path_file(file_name)
         os.makedirs(os.path.dirname(_test_path_file), exist_ok=True)
         with open(_test_path_file, 'w') as _write_obj:
             _csv_writer = writer(_write_obj)
@@ -169,12 +159,10 @@ if __name__ == '__main__':
             id_genes_train.append(id_genes_train[i])
 
     # Save pre-processing information
-    import pickle
-
     config = {
         'k-size': args.k_size,
         'split': args.split
     }
-    pickle_path_file = os.path.join(os.getcwd(), "training", args.output_file + ".pickle")
-    with open(pickle_path_file, 'wb') as handle:
+    conf_path_file = create_conf_path_file(args.output_file)
+    with open(conf_path_file, 'wb') as handle:
         pickle.dump(config, handle, protocol=pickle.HIGHEST_PROTOCOL)
