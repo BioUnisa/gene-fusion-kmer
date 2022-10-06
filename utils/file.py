@@ -1,19 +1,4 @@
-from Bio import SeqIO
-from typing import Sequence
-
 import os
-
-
-def read_sequences_from_fasta(file_path: str) -> (Sequence[str], Sequence[str]):
-    _fasta_sequences = SeqIO.parse(open(file_path), 'fasta')
-    _id_genes = []
-    _sequences = []
-
-    for fasta in _fasta_sequences:
-        _id_genes.append(fasta.id)
-        _sequences.append(str(fasta.seq))
-
-    return _id_genes, _sequences
 
 
 def create_training_path_file(file_name: str) -> str:
