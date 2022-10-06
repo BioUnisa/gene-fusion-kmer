@@ -2,6 +2,7 @@ from csv import writer
 from functools import partial
 from multiprocessing.pool import Pool
 from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder
 from typing import Sequence, Tuple
 from utils.file import read_sequences_from_fasta
 from utils.file import create_training_path_file, create_test_path_file, create_conf_path_file
@@ -116,9 +117,12 @@ if __name__ == '__main__':
     id_genes, sequences = read_sequences_from_fasta(args.input_file)
     print(f"Read {len(sequences)} sequence(s)!")
 
-    # Get list of genes
-    list_of_genes = np.unique(id_genes)
-    print(f"Number of total genes: {len(list_of_genes)}")
+    # Get label and encoded label
+    classes = np.unique(id_genes)
+    n_classes = len(classes)
+    print(f"Number of total genes: {n_classes}")
+    label_encoder = LabelEncoder()
+    label_encoder.fit_transform(id_genes)
 
     # Split in training and test
     sequences_train = sequences
@@ -161,7 +165,10 @@ if __name__ == '__main__':
     # Save pre-processing information
     config = {
         'k-size': args.k_size,
-        'split': args.split
+        'split': args.split,
+        'classes': classes,
+        'n_classes': n_classes,
+        'label-encoder': label_encoder
     }
     conf_path_file = create_conf_path_file(args.output_file)
     with open(conf_path_file, 'wb') as handle:
