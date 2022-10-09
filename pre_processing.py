@@ -14,7 +14,7 @@ import os
 import pickle
 
 
-def str2bool(v):
+def str2bool(v: str) -> bool:
     if isinstance(v, bool):
         return v
     if v.lower() in ('yes', 'true', 't', 'y', '1'):
@@ -70,11 +70,13 @@ def split_sequences_on_processes(_id_genes: Sequence[str], _sequences: Sequence[
     return _split_fasta_sequences
 
 
-def sort_dict(_map_id_n_kmers):
+def sort_dict(_map_id_n_kmers: dict[str, int]) -> dict[str, int]:
     return {_k: _v for _k, _v in sorted(map_id_n_kmers.items(), key=lambda item: item[1])}
 
 
-def sample_dataset(_id_genes, _sequences, _map_id_n_kmers, k_size, _min, _max):
+def sample_dataset(_id_genes: Sequence[str], _sequences: Sequence[str],
+                   _map_id_n_kmers: dict[str, str], k_size: int, _min: int, _max: int) \
+        -> (Sequence[str], Sequence[str], dict[str, str]):
     n_sequences = len(_sequences)
     new_id_genes = []
     new_sequences = []
