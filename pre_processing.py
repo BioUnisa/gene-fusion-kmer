@@ -152,7 +152,7 @@ if __name__ == '__main__':
     parser.add_argument('-min', dest='min', action='store',
                         type=int, default=0, help='min number of kmers that genes need to have')
     parser.add_argument('-max', dest='max', action='store',
-                        type=int, default=np.inf, help='min number of kmers that genes need to have')
+                        type=int, default=np.inf, help='max number of kmers that genes need to have')
     parser.add_argument('-t_size', dest='t_size', action='store',
                         type=float, default=0.3, help='define test size')
     parser.add_argument('-num_proc', dest='num_proc', action='store',
