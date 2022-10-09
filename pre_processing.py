@@ -70,6 +70,35 @@ def split_sequences_on_processes(_id_genes: Sequence[str], _sequences: Sequence[
     return _split_fasta_sequences
 
 
+def sort_dict(_map_id_n_kmers):
+    return {_k: _v for _k, _v in sorted(map_id_n_kmers.items(), key=lambda item: item[1])}
+
+
+def sample_dataset(_id_genes, _sequences, _map_id_n_kmers, k_size, _min, _max):
+    n_sequences = len(_sequences)
+    new_id_genes = []
+    new_sequences = []
+    new_map_id_n_kmers = {k: 0 for k in np.unique(id_genes)}
+
+    for i in range(n_sequences):
+        _id = _id_genes[i]
+        _sequence = _sequences[i]
+        if _map_id_n_kmers[_id] >= _min:
+            _rest = _max - new_map_id_n_kmers[_id]
+            if _rest > 0:
+                new_id_genes.append(_id)
+                n_kmers = len(_sequence) - k_size + 1
+                if n_kmers <= _rest:
+                    new_sequences.append(_sequence)
+                    new_map_id_n_kmers[_id] += n_kmers
+                else:
+                    end = k_size + _rest - 1
+                    new_sequences.append(_sequence[0:end])
+                    new_map_id_n_kmers[_id] += _rest
+
+    return new_id_genes, new_sequences, new_map_id_n_kmers
+
+
 # Create two blank csv file for output
 def create_output_files(file_name: str, split: bool) -> (str, str):
     _training_path_file = create_training_path_file(file_name)
@@ -86,7 +115,7 @@ def create_output_files(file_name: str, split: bool) -> (str, str):
             _csv_writer.writerow(['id_gene', 'sequence'])
         return _training_path_file, _test_path_file
     else:
-        return _training_path_file, ""
+        return _training_path_file, ''
 
 
 def build_kmers(fasta_sequences: Sequence[Tuple[str, str]], k_size: int, file_path: str) -> None:
@@ -120,8 +149,10 @@ if __name__ == '__main__':
                         type=int, default=15, help='define size of kmer')
     parser.add_argument('-split', dest='split', action='store',
                         type=str2bool, default=True, help='split dataset in training and set')
-    parser.add_argument('-balance', dest='balance', action='store',
-                        type=str2bool, default=False, help='data reduction based on kmer numbers')
+    parser.add_argument('-min', dest='min', action='store',
+                        type=int, default=0, help='min number of kmers that genes need to have')
+    parser.add_argument('-max', dest='max', action='store',
+                        type=int, default=np.inf, help='min number of kmers that genes need to have')
     parser.add_argument('-t_size', dest='t_size', action='store',
                         type=float, default=0.3, help='define test size')
     parser.add_argument('-num_proc', dest='num_proc', action='store',
@@ -132,24 +163,38 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     if args.input_file == '':
-        print("pre_processing: missing input file")
-        print("Try 'pre_processing --help' for more information.")
+        print('pre_processing: missing input file')
+        print('Try "pre_processing.py" --help for more information.')
         exit()
 
     # Get all id and sequences from input fasta file
-    print(f"Start reading {args.input_file} file...")
+    print(f'Start reading {args.input_file} file...')
     id_genes, sequences, map_id_n_kmers = read_sequences_from_fasta(args.input_file, args.k_size)
-    print(f"Read {len(sequences)} sequence(s)!")
+    print(f'Read {len(sequences)} sequence(s)!')
+    # Log number of kmers for each gene
+    map_id_n_kmers = sort_dict(map_id_n_kmers)
+    with open('pre_processing.log', 'w') as logger:
+        logger.write("Before performing sampling operations\n")
+        for k, v in map_id_n_kmers.items():
+            logger.write(f'{k} : {v}\n')
 
-    if args.balance:
-        map_id_n_kmers = {k: v for k, v in sorted(map_id_n_kmers.items(), key=lambda item: item[1])}
-        print(map_id_n_kmers)
+    # Sample dataset with min and max
+    id_genes, sequences, map_id_n_kmers = sample_dataset(
+        id_genes, sequences, map_id_n_kmers, args.k_size, args.min, args.max)
+    # Log number of kmers for each gene
+    map_id_n_kmers = sort_dict(map_id_n_kmers)
+    with open('pre_processing.log', 'a') as logger:
+        logger.write("\nAfter performing sampling operations\n")
+        for k, v in map_id_n_kmers.items():
+            if v > 0:
+                logger.write(f'{k} : {v}\n')
+    print("Sampling phase terminated")
+    print("pre_processing.log generated!")
 
-    """
     # Get label and encoded label
     classes = np.unique(id_genes)
     n_classes = len(classes)
-    print(f"Number of total genes: {n_classes}")
+    print(f'Number of total genes: {n_classes}')
     label_encoder = LabelEncoder()
     label_encoder.fit_transform(id_genes)
 
@@ -159,10 +204,10 @@ if __name__ == '__main__':
     if args.split:
         sequences_train, sequences_test, id_genes_train, id_genes_test = train_test_split(
             sequences, id_genes, test_size=args.t_size, random_state=42)
-        print(f"Sequences divided by a coefficient: {args.t_size}")
-        print(f"Number of sequences in the training set: {len(sequences_train)}")
+        print(f'Sequences divided by a coefficient: {args.t_size}')
+        print(f'Number of sequences in the training set: {len(sequences_train)}')
         n_test_elements = len(sequences_test)
-        print(f"Number of sequences in the test set: {n_test_elements}")
+        print(f'Number of sequences in the test set: {n_test_elements}')
         # Split work on processes
         split_fasta_sequences_train = split_sequences_on_processes(
             id_genes_train, sequences_train, args.num_proc)
@@ -177,14 +222,14 @@ if __name__ == '__main__':
     with Pool(args.num_proc) as pool:
         pool.map(partial(build_kmers, k_size=args.k_size, file_path=training_path_file),
                  split_fasta_sequences_train)
-    print(f"{training_path_file} generated!")
+    print(f'{training_path_file} generated!')
 
     # Create test dataset
     if args.split:
         with open(test_path_file, 'a+') as write_obj:
             csv_writer = writer(write_obj)
             csv_writer.writerows([[id_genes_test[i], sequences_test[i]] for i in range(n_test_elements)])
-        print(f"{test_path_file} generated!")
+        print(f'{test_path_file} generated!')
 
     # Save pre-processing information
     config = {
@@ -197,4 +242,3 @@ if __name__ == '__main__':
     conf_path_file = create_conf_path_file(args.output_file)
     with open(conf_path_file, 'wb') as handle:
         pickle.dump(config, handle, protocol=pickle.HIGHEST_PROTOCOL)
-        """
