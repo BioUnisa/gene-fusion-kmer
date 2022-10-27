@@ -7,6 +7,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 from typing import Sequence, Tuple, Dict
 from utils.file import create_training_path_file, create_test_path_file, create_conf_path_file
+from utils.input import str2bool
 
 import argparse
 import numpy as np
@@ -14,23 +15,13 @@ import os
 import pickle
 
 
-def str2bool(v: str) -> bool:
-    if isinstance(v, bool):
-        return v
-    if v.lower() in ('yes', 'true', 't', 'y', '1'):
-        return True
-    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
-        return False
-    else:
-        raise argparse.ArgumentTypeError('Boolean value expected.')
+def read_sequences_from_fasta(file_path: str,
+                              k_size: int) -> (Sequence[str], Sequence[str], Dict[str, int]):
 
-
-def read_sequences_from_fasta(file_path: str, k_size: int) -> \
-        (Sequence[str], Sequence[str], Dict[str, int]):
     _fasta_sequences = SeqIO.parse(open(file_path), 'fasta')
-    _id_genes = []
-    _sequences = []
-    _map_id_n_kmers = {}
+    _id_genes: Sequence[str] = []
+    _sequences: Sequence[str] = []
+    _map_id_n_kmers: Dict[str, int] = {}
 
     for fasta in _fasta_sequences:
         _id = fasta.id
@@ -46,15 +37,17 @@ def read_sequences_from_fasta(file_path: str, k_size: int) -> \
     return _id_genes, _sequences, _map_id_n_kmers
 
 
-def split_sequences_on_processes(_id_genes: Sequence[str], _sequences: Sequence[str],
+def split_sequences_on_processes(_id_genes: Sequence[str],
+                                 _sequences: Sequence[str],
                                  _num_proc: int) -> Sequence[Sequence[Tuple[str, str]]]:
+
     # Get size of chunk and rest
     _n_fasta_sequences = len(_sequences)
     _chunk_size = _n_fasta_sequences // _num_proc
     _rest_size = _n_fasta_sequences % _num_proc
 
     # Initialize arrays to work on
-    _split_fasta_sequences = [None] * _num_proc
+    _split_fasta_sequences: Sequence[str] = [None] * _num_proc
 
     rest_added = 0
     for i in range(_num_proc):
@@ -74,13 +67,17 @@ def sort_dict(_map_id_n_kmers: dict[str, int]) -> dict[str, int]:
     return {_k: _v for _k, _v in sorted(map_id_n_kmers.items(), key=lambda item: item[1])}
 
 
-def sample_dataset(_id_genes: Sequence[str], _sequences: Sequence[str],
-                   _map_id_n_kmers: dict[str, str], k_size: int, _min: int, _max: int) \
-        -> (Sequence[str], Sequence[str], dict[str, str]):
+def sample_dataset(_id_genes: Sequence[str],
+                   _sequences: Sequence[str],
+                   _map_id_n_kmers: dict[str, str],
+                   k_size: int,
+                   _min: int,
+                   _max: int) -> (Sequence[str], Sequence[str], Dict[str, str]):
+
     n_sequences = len(_sequences)
-    new_id_genes = []
-    new_sequences = []
-    new_map_id_n_kmers = {k: 0 for k in np.unique(id_genes)}
+    new_id_genes: Sequence[str] = []
+    new_sequences: Sequence[str] = []
+    new_map_id_n_kmers: Dict[str, str] = {_id: 0 for _id in np.unique(id_genes)}
 
     for i in range(n_sequences):
         _id = _id_genes[i]
@@ -102,7 +99,9 @@ def sample_dataset(_id_genes: Sequence[str], _sequences: Sequence[str],
 
 
 # Create two blank csv file for output
-def create_output_files(file_name: str, split: bool) -> (str, str):
+def create_output_files(file_name: str,
+                        split: bool) -> (str, str):
+
     _training_path_file = create_training_path_file(file_name)
     os.makedirs(os.path.dirname(_training_path_file), exist_ok=True)
     with open(_training_path_file, 'w') as _write_obj:
@@ -120,7 +119,10 @@ def create_output_files(file_name: str, split: bool) -> (str, str):
         return _training_path_file, ''
 
 
-def build_kmers(fasta_sequences: Sequence[Tuple[str, str]], k_size: int, file_path: str) -> None:
+def build_kmers(fasta_sequences: Sequence[Tuple[str, str]],
+                k_size: int,
+                file_path: str) -> None:
+
     for fasta in fasta_sequences:
         id_gene = fasta[0]
         sequence = fasta[1]
@@ -134,7 +136,10 @@ def build_kmers(fasta_sequences: Sequence[Tuple[str, str]], k_size: int, file_pa
         print_kmers(file_path, id_gene, kmers)
 
 
-def print_kmers(file_path: str, id_gene: str, kmers: Sequence[int]) -> None:
+def print_kmers(file_path: str,
+                id_gene: str,
+                kmers: Sequence[int]) -> None:
+
     with open(file_path, 'a+') as _write_obj:
         _csv_writer = writer(_write_obj)
         for kmer in kmers:
