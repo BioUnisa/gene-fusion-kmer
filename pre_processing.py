@@ -99,8 +99,7 @@ def sample_dataset(_id_genes: Sequence[str],
 
 
 # Create two blank csv file for output
-def create_output_files(file_name: str,
-                        split: bool) -> (str, str):
+def create_output_files(file_name: str) -> (str, str):
 
     _training_path_file = create_training_path_file(file_name)
     os.makedirs(os.path.dirname(_training_path_file), exist_ok=True)
@@ -108,15 +107,12 @@ def create_output_files(file_name: str,
         _csv_writer = writer(_write_obj)
         _csv_writer.writerow(['id_gene', 'kmer'])
 
-    if split:
-        _test_path_file = create_test_path_file(file_name)
-        os.makedirs(os.path.dirname(_test_path_file), exist_ok=True)
-        with open(_test_path_file, 'w') as _write_obj:
-            _csv_writer = writer(_write_obj)
-            _csv_writer.writerow(['id_gene', 'sequence'])
-        return _training_path_file, _test_path_file
-    else:
-        return _training_path_file, ''
+    _test_path_file = create_test_path_file(file_name)
+    os.makedirs(os.path.dirname(_test_path_file), exist_ok=True)
+    with open(_test_path_file, 'w') as _write_obj:
+        _csv_writer = writer(_write_obj)
+        _csv_writer.writerow(['id_gene', 'sequence'])
+    return _training_path_file, _test_path_file
 
 
 def build_kmers(fasta_sequences: Sequence[Tuple[str, str]],
@@ -154,14 +150,12 @@ if __name__ == '__main__':
                         default='', help='fasta input file')
     parser.add_argument('-k_size', dest='k_size', action='store',
                         type=int, default=15, help='define size of kmer')
-    parser.add_argument('-split', dest='split', action='store',
-                        type=str2bool, default=True, help='split dataset in training and set')
     parser.add_argument('-min', dest='min', action='store',
                         type=int, default=0, help='min number of kmers that genes need to have')
     parser.add_argument('-max', dest='max', action='store',
                         type=int, default=np.inf, help='max number of kmers that genes need to have')
     parser.add_argument('-t_size', dest='t_size', action='store',
-                        type=float, default=0.3, help='define test size')
+                        type=float, default=0.2, help='define test size')
     parser.add_argument('-num_proc', dest='num_proc', action='store',
                         type=int, default=os.cpu_count(), help='number of processes')
     parser.add_argument('-o', dest='output_file', action='store',
@@ -208,22 +202,18 @@ if __name__ == '__main__':
     # Split in training and test
     sequences_train = sequences
     id_genes_train = id_genes
-    if args.split:
-        sequences_train, sequences_test, id_genes_train, id_genes_test = train_test_split(
-            sequences, id_genes, test_size=args.t_size, random_state=42)
-        print(f'Sequences divided by a coefficient: {args.t_size}')
-        print(f'Number of sequences in the training set: {len(sequences_train)}')
-        n_test_elements = len(sequences_test)
-        print(f'Number of sequences in the test set: {n_test_elements}')
-        # Split work on processes
-        split_fasta_sequences_train = split_sequences_on_processes(
-            id_genes_train, sequences_train, args.num_proc)
-    else:
-        # Split work on processes
-        split_fasta_sequences_train = split_sequences_on_processes(id_genes, sequences, args.num_proc)
+    sequences_train, sequences_test, id_genes_train, id_genes_test = train_test_split(
+        sequences, id_genes, test_size=args.t_size, random_state=42)
+    print(f'Sequences divided by a coefficient: {args.t_size}')
+    print(f'Number of sequences in the training set: {len(sequences_train)}')
+    n_test_elements = len(sequences_test)
+    print(f'Number of sequences in the test set: {n_test_elements}')
+    # Split work on processes
+    split_fasta_sequences_train = split_sequences_on_processes(
+        id_genes_train, sequences_train, args.num_proc)
 
     # Create output files
-    training_path_file, test_path_file = create_output_files(args.output_file, args.split)
+    training_path_file, test_path_file = create_output_files(args.output_file)
 
     # Create kmer training dataset
     with Pool(args.num_proc) as pool:
@@ -232,16 +222,14 @@ if __name__ == '__main__':
     print(f'{training_path_file} generated!')
 
     # Create test dataset
-    if args.split:
-        with open(test_path_file, 'a+') as write_obj:
-            csv_writer = writer(write_obj)
-            csv_writer.writerows([[id_genes_test[i], sequences_test[i]] for i in range(n_test_elements)])
-        print(f'{test_path_file} generated!')
+    with open(test_path_file, 'a+') as write_obj:
+        csv_writer = writer(write_obj)
+        csv_writer.writerows([[id_genes_test[i], sequences_test[i]] for i in range(n_test_elements)])
+    print(f'{test_path_file} generated!')
 
     # Save pre-processing information
     config = {
         'k-size': args.k_size,
-        'split': args.split,
         'classes': classes,
         'n_classes': n_classes,
         'label-encoder': label_encoder
